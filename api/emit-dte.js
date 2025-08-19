@@ -208,7 +208,7 @@ function handleCORS(req, res) {
 /**
  * 🚀 FUNCIÓN PRINCIPAL - ENDPOINT VERCEL
  */
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Manejo de CORS
   if (handleCORS(req, res)) return;
   
