@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Test Webhook Lioren</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 8px 4px;
+    }
+    button:hover { background: #0056b3; }
+    .error { background: #dc3545; }
+    .success { background: #28a745; }
+    .result {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .result.success { background: #d4edda; border: 1px solid #c3e6cb; }
+    .result.error { background: #f8d7da; border: 1px solid #f5c6cb; }
+    input, select {
+      width: 100%;
+      padding: 8px 12px;
+      margin: 4px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .form-group {
+      margin: 1rem 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Test Webhook Lioren</h1>
+    <p>Prueba tu integración Shopify → Lioren antes de ir a producción</p>
+    
+    <h3>📋 Datos de Prueba</h3>
+    
+    <div class="form-group">
+      <label>Tipo de Documento:</label>
+      <select id="docType">
+        <option value="39">Boleta (39)</option>
+        <option value="33">Factura (33)</option>
+      </select>
+    </div>
+
+    <div id="facturaFields" style="display:none;">
+      <div class="form-group">
+        <label>RUT:</label>
+        <input type="text" id="rut" value="12345678-9" placeholder="12345678-9">
+      </div>
+      
+      <div class="form-group">
+        <label>Empresa:</label>
+        <input type="text" id="company" value="Mi Empresa de Prueba SpA">
+      </div>
+      
+      <div class="form-group">
+        <label>Giro:</label>
+        <input type="text" id="giro" value="Venta de productos de prueba">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Comuna:</label>
+      <input type="text" id="commune" value="Santiago">
+    </div>
+
+    <div class="form-group">
+      <label>Total:</label>
+      <input type="number" id="total" value="25990">
+    </div>
+
+    <h3>🚀 Pruebas</h3>
+    <button onclick="testPing()">📡 Test Conexión</button>
+    <button onclick="testBoleta()">🧾 Test Boleta</button>
+    <button onclick="testFactura()">📄 Test Factura</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const WEBHOOK_URL = 'https://lioren-eta.vercel.app/api/emit-dte';
+
+    // Mostrar/ocultar campos de factura
+    document.getElementById('docType').addEventListener('change', function() {
+      const fields = document.getElementById('facturaFields');
+      fields.style.display = this.value === '33' ? 'block' : 'none';
+    });
+
+    function showResult(data, isError = false) {
+      const result = document.getElementById('result');
+      result.textContent = JSON.stringify(data, null, 2);
+      result.className = `result ${isError ? 'error' : 'success'}`;
+    }
+
+    async function testPing() {
+      showResult({ status: 'Testing...', message: 'Probando conexión al webhook...' });
+      
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'OPTIONS',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        showResult({
+          status: 'CONEXIÓN OK',
+          statusCode: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          message: '✅ Webhook responde correctamente'
+        });
+      } catch (error) {
+        showResult({
+          status: 'ERROR DE CONEXIÓN',
+          error: error.message,
+          message: '❌ No se puede conectar al webhook'
+        }, true);
+      }
+    }
+
+    async function testBoleta() {
+      showResult({ status: 'Testing...', message: 'Emitiendo boleta de prueba...' });
+      
+      const payload = {
+        docType: '39',
+        commune: document.getElementById('commune').value,
+        region: 'Región Metropolitana',
+        items: [
+          {
+            title: 'Producto de Prueba 1',
+            quantity: 2,
+            price: 10000,
+            line_price: 20000,
+            sku: 'TEST-001'
+          },
+          {
+            title: 'Producto de Prueba 2', 
+            quantity: 1,
+            price: 5990,
+            line_price: 5990,
+            sku: 'TEST-002'
+          }
+        ],
+        total: parseFloat(document.getElementById('total').value),
+        orderNumber: `TEST-BOLETA-${Date.now()}`,
+        email: 'test@ejemplo.com'
+      };
+
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          showResult({
+            status: '✅ BOLETA EMITIDA',
+            ...result,
+            payload_enviado: payload
+          });
+        } else {
+          showResult({
+            status: '❌ ERROR EMITIENDO BOLETA',
+            ...result,
+            payload_enviado: payload
+          }, true);
+        }
+      } catch (error) {
+        showResult({
+          status: '❌ ERROR DE RED',
+          error: error.message,
+          payload_enviado: payload
+        }, true);
+      }
+    }
+
+    async function testFactura() {
+      showResult({ status: 'Testing...', message: 'Emitiendo factura de prueba...' });
+      
+      const payload = {
+        docType: '33',
+        rut: document.getElementById('rut').value,
+        company: document.getElementById('company').value,
+        giro: document.getElementById('giro').value,
+        commune: document.getElementById('commune').value,
+        region: 'Región Metropolitana',
+        items: [
+          {
+            title: 'Servicio Profesional',
+            quantity: 1,
+            price: 25990,
+            line_price: 25990,
+            sku: 'SERV-001'
+          }
+        ],
+        total: parseFloat(document.getElementById('total').value),
+        orderNumber: `TEST-FACTURA-${Date.now()}`,
+        email: 'facturacion@empresa.com'
+      };
+
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          showResult({
+            status: '✅ FACTURA EMITIDA',
+            ...result,
+            payload_enviado: payload
+          });
+        } else {
+          showResult({
+            status: '❌ ERROR EMITIENDO FACTURA',
+            ...result,
+            payload_enviado: payload
+          }, true);
+        }
+      } catch (error) {
+        showResult({
+          status: '❌ ERROR DE RED',
+          error: error.message,
+          payload_enviado: payload
+        }, true);
+      }
+    }
+
+    // Test inicial
+    setTimeout(testPing, 1000);
+  </script>
+</body>
+</html>
