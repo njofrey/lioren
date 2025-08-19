@@ -6,7 +6,7 @@
 
 // Configuración (¡CAMBIAR POR TUS CREDENCIALES!)
 const LIOREN_CONFIG = {
-  baseUrl: 'https://api.lioren.enterprises/v1',
+  baseUrl: 'https://www.lioren.cl/api',
   // ⚠️ IMPORTANTE: Agrega tu API key en las variables de entorno de Vercel
   apiKey: process.env.LIOREN_API_KEY || 'TU_API_KEY_AQUI',
   timeout: 30000
@@ -71,70 +71,74 @@ function validarDatos(data) {
 }
 
 /**
- * Formatea los items para la API de Lioren
+ * Formatea los items para la API de Lioren (según documentación oficial)
  */
 function formatearItems(items) {
   return items.map((item, index) => ({
-    line_number: index + 1,
-    name: item.title || item.name || 'Producto',
-    description: item.description || item.title || 'Producto',
-    quantity: item.quantity || 1,
-    unit: 'UN',
-    unit_price: Math.round((item.price || 0) * 100) / 100, // Redondeamos a 2 decimales
-    total: Math.round((item.line_price || item.price * item.quantity || 0) * 100) / 100,
-    sku: item.sku || item.variant_id || `PROD-${index + 1}`,
-    // Datos fiscales chilenos
-    tax_type: 1, // IVA
-    tax_rate: 19, // 19% IVA Chile
-    tax_amount: Math.round((item.line_price || item.price * item.quantity || 0) * 0.19 * 100) / 100
+    codigo: item.sku || item.variant_id || `PROD-${index + 1}`,
+    nombre: (item.title || item.name || 'Producto').substring(0, 80), // Max 80 chars
+    cantidad: item.quantity || 1,
+    unidad: 'UN',
+    precio: Math.round((item.price || 0)), // Precio unitario sin decimales según docs
+    exento: false, // Por defecto afecto a IVA
+    descripcion: (item.description || item.title || '').substring(0, 1000) // Max 1000 chars
   }));
 }
 
 /**
- * Emite una boleta (documento tipo 39)
+ * Emite una boleta (documento tipo 39) según documentación oficial
  */
 async function emitirBoleta(data) {
   const payload = {
-    document_type: 39,
-    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-    client: {
-      // Para boletas, cliente genérico
-      tax_id: '66666666-6',
-      name: 'CONSUMIDOR FINAL',
-      address: data.shipping?.address1 || 'Sin dirección',
-      city: data.shipping?.city || data.commune || 'Sin comuna',
-      state: data.region || 'Sin región'
+    emisor: {
+      tipodoc: '39', // Boleta
+      servicio: 3, // Boleta de Ventas y Servicios (requerido según docs)
+      observaciones: `Venta online - Shopify Order ${data.orderNumber || 'N/A'}`
     },
-    items: formatearItems(data.items),
-    notes: `Venta online - Shopify Order ${data.orderNumber || 'N/A'}`
+    // Para boletas, receptor es opcional según docs
+    detalles: formatearItems(data.items),
+    expects: 'all' // Retornar PDF y XML
   };
   
-  return await llamarAPILioren('/documents', payload);
+  // Solo agregar receptor si tenemos datos del cliente
+  if (data.rut && data.company) {
+    payload.receptor = {
+      rut: data.rut.replace(/[^0-9kK]/g, ''), // Sin puntos ni guiones
+      rs: data.company.substring(0, 100), // Max 100 chars
+      comuna: 95, // Por defecto Santiago (necesario consultar API comunas)
+      ciudad: 76, // Por defecto Santiago (necesario consultar API ciudades)  
+      direccion: (data.shipping?.address1 || 'Sin dirección').substring(0, 50)
+    };
+  }
+  
+  return await llamarAPILioren('/boletas', payload);
 }
 
 /**
- * Emite una factura (documento tipo 33)
+ * Emite una factura (documento tipo 33) según documentación oficial
  */
 async function emitirFactura(data) {
   const payload = {
-    document_type: 33,
-    date: new Date().toISOString().split('T')[0],
-    client: {
-      tax_id: data.rut,
-      name: data.company,
-      business_line: data.giro,
-      address: data.shipping?.address1 || 'Sin dirección',
-      city: data.shipping?.city || data.commune || 'Sin comuna',
-      state: data.region || 'Sin región',
-      // Campos adicionales para facturas
-      email: data.email || '',
-      phone: data.phone || ''
+    emisor: {
+      tipodoc: '33', // Factura
+      fecha: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+      observaciones: `Venta online - Shopify Order ${data.orderNumber || 'N/A'}`
     },
-    items: formatearItems(data.items),
-    notes: `Venta online - Shopify Order ${data.orderNumber || 'N/A'}`
+    receptor: {
+      rut: data.rut.replace(/[^0-9kK]/g, ''), // Sin puntos ni guiones según docs
+      rs: data.company.substring(0, 100), // Max 100 chars según docs
+      giro: data.giro.substring(0, 40), // Max 40 chars según docs
+      comuna: 95, // Por defecto Santiago - TODO: obtener desde API /comunas
+      ciudad: 76, // Por defecto Santiago - TODO: obtener desde API /ciudades
+      direccion: (data.shipping?.address1 || 'Sin dirección').substring(0, 50), // Max 50 chars
+      email: (data.email || '').substring(0, 80), // Max 80 chars
+      telefono: (data.phone || '').substring(0, 9) // Max 9 chars
+    },
+    detalles: formatearItems(data.items),
+    expects: 'all' // Retornar PDF y XML
   };
   
-  return await llamarAPILioren('/documents', payload);
+  return await llamarAPILioren('/dtes', payload);
 }
 
 /**
