@@ -1,0 +1,19 @@
+{
+  "name": "lioren-shopify-webhook",
+  "version": "1.0.0",
+  "description": "Webhook para integración Shopify-Lioren DTE",
+  "main": "api/emit-dte.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["shopify", "lioren", "dte", "webhook", "chile"],
+  "author": "Nicolas Jofre - A Gourmet",
+  "license": "MIT"
+}
