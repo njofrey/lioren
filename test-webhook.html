@@ -102,14 +102,19 @@
 
     <h3>🚀 Pruebas</h3>
     <button onclick="testPing()">📡 Test Conexión</button>
-    <button onclick="testBoleta()">🧾 Test Boleta</button>
-    <button onclick="testFactura()">📄 Test Factura</button>
+    <button onclick="testValidateBoleta()">🧪 Validar Boleta (SIN EMISIÓN)</button>
+    <button onclick="testValidateFactura()">🧪 Validar Factura (SIN EMISIÓN)</button>
+    <hr>
+    <p style="color: #dc3545; font-weight: bold;">⚠️ SOLO USAR CON API KEY REAL:</p>
+    <button onclick="testBoleta()" class="error">🧾 Emitir Boleta REAL</button>
+    <button onclick="testFactura()" class="error">📄 Emitir Factura REAL</button>
 
     <div id="result"></div>
   </div>
 
   <script>
     const WEBHOOK_URL = 'https://lioren-eta.vercel.app/api/emit-dte';
+    const VALIDATE_URL = 'https://lioren-eta.vercel.app/api/validate';
 
     // Mostrar/ocultar campos de factura
     document.getElementById('docType').addEventListener('change', function() {
@@ -150,7 +155,7 @@
     }
 
     async function testBoleta() {
-      showResult({ status: 'Testing...', message: 'Emitiendo boleta de prueba...' });
+      showResult({ status: 'Testing...', message: '🧪 Validando estructura de boleta (SIN EMISIÓN REAL)...' });
       
       const payload = {
         docType: '39',
@@ -210,6 +215,64 @@
       }
     }
 
+    async function testValidateBoleta() {
+      showResult({ status: 'Testing...', message: '🧪 Validando estructura de boleta (SIN EMISIÓN REAL)...' });
+      
+      const payload = {
+        docType: '39',
+        commune: document.getElementById('commune').value,
+        region: 'Región Metropolitana',
+        items: [
+          {
+            title: 'Producto de Prueba 1',
+            quantity: 2,
+            price: 10000,
+            line_price: 20000,
+            sku: 'TEST-001'
+          },
+          {
+            title: 'Producto de Prueba 2', 
+            quantity: 1,
+            price: 5990,
+            line_price: 5990,
+            sku: 'TEST-002'
+          }
+        ],
+        total: parseFloat(document.getElementById('total').value),
+        orderNumber: `TEST-VALIDATE-BOLETA-${Date.now()}`,
+        email: 'test@ejemplo.com'
+      };
+
+      try {
+        const response = await fetch(VALIDATE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          showResult({
+            status: '🧪 VALIDACIÓN EXITOSA - BOLETA',
+            ...result
+          });
+        } else {
+          showResult({
+            status: '❌ ERROR EN VALIDACIÓN',
+            ...result
+          }, true);
+        }
+      } catch (error) {
+        showResult({
+          status: '❌ ERROR DE RED',
+          error: error.message
+        }, true);
+      }
+    }
+
     async function testFactura() {
       showResult({ status: 'Testing...', message: 'Emitiendo factura de prueba...' });
       
@@ -263,6 +326,60 @@
           status: '❌ ERROR DE RED',
           error: error.message,
           payload_enviado: payload
+        }, true);
+      }
+    }
+
+    async function testValidateFactura() {
+      showResult({ status: 'Testing...', message: '🧪 Validando estructura de factura (SIN EMISIÓN REAL)...' });
+      
+      const payload = {
+        docType: '33',
+        rut: document.getElementById('rut').value,
+        company: document.getElementById('company').value,
+        giro: document.getElementById('giro').value,
+        commune: document.getElementById('commune').value,
+        region: 'Región Metropolitana',
+        items: [
+          {
+            title: 'Servicio Profesional',
+            quantity: 1,
+            price: 25990,
+            line_price: 25990,
+            sku: 'SERV-001'
+          }
+        ],
+        total: parseFloat(document.getElementById('total').value),
+        orderNumber: `TEST-VALIDATE-FACTURA-${Date.now()}`,
+        email: 'facturacion@empresa.com'
+      };
+
+      try {
+        const response = await fetch(VALIDATE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          showResult({
+            status: '🧪 VALIDACIÓN EXITOSA - FACTURA',
+            ...result
+          });
+        } else {
+          showResult({
+            status: '❌ ERROR EN VALIDACIÓN',
+            ...result
+          }, true);
+        }
+      } catch (error) {
+        showResult({
+          status: '❌ ERROR DE RED',
+          error: error.message
         }, true);
       }
     }
